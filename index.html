@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>環境保衛戰：8x8 矩陣版</title>
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --led-off: #111;
+            --led-red: #ff3333;
+            --led-green: #33ff33;
+            --led-blue: #33bbff;
+            --led-yellow: #ffee33;
+            --led-white: #eeeeee;
+            --led-orange: #ff9933;
+            --basket-bg: #16213e;
+            --basket-border: #e94560;
+            --basket-hover: #e9456044;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            color: #e94560;
+            text-shadow: 0 0 10px #e94560;
+            margin-bottom: 20px;
+            font-size: 2.2rem;
+            text-align: center;
+        }
+
+        .header-links {
+            margin-bottom: 20px;
+        }
+
+        .header-links a {
+            color: #00ffcc;
+            text-decoration: none;
+            border: 1px solid #00ffcc;
+            padding: 8px 15px;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+
+        .header-links a:hover {
+            background: #00ffcc;
+            color: #1a1a2e;
+        }
+
+        .arcade-cabinet {
+            background: linear-gradient(135deg, #2a2a4a, #16213e);
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(255, 255, 255, 0.1);
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        /* 中央螢幕：包含計分與 8x8 矩陣 */
+        .main-screen {
+            background-color: #050505;
+            border: 6px solid #333;
+            border-radius: 10px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        .stats-bar {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.5rem;
+            font-family: 'Courier New', Courier, monospace;
+            color: #ffd700;
+            text-shadow: 0 0 5px #ffd700;
+            margin-bottom: 20px;
+        }
+
+        /* 8x8 LED 矩陣 */
+        .led-matrix {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 4px;
+            background-color: #222;
+            padding: 8px;
+            border-radius: 8px;
+            border: 2px solid #444;
+            width: 240px;
+            height: 240px;
+        }
+
+        .led-dot {
+            background-color: var(--led-off);
+            border-radius: 50%;
+            width: 100%;
+            height: 100%;
+            box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.5);
+            transition: background-color 0.1s;
+        }
+
+        .led-dot.on-red {
+            background-color: var(--led-red);
+            box-shadow: 0 0 8px var(--led-red);
+        }
+
+        .led-dot.on-green {
+            background-color: var(--led-green);
+            box-shadow: 0 0 8px var(--led-green);
+        }
+
+        .led-dot.on-blue {
+            background-color: var(--led-blue);
+            box-shadow: 0 0 8px var(--led-blue);
+        }
+
+        .led-dot.on-yellow {
+            background-color: var(--led-yellow);
+            box-shadow: 0 0 8px var(--led-yellow);
+        }
+
+        .led-dot.on-white {
+            background-color: var(--led-white);
+            box-shadow: 0 0 8px var(--led-white);
+        }
+
+        .led-dot.on-orange {
+            background-color: var(--led-orange);
+            box-shadow: 0 0 8px var(--led-orange);
+        }
+
+        .item-name-display {
+            margin-top: 15px;
+            font-size: 1.8rem;
+            color: #00ffcc;
+            text-shadow: 0 0 10px #00ffcc;
+            height: 40px;
+            /* 固定高度避免跳動 */
+        }
+
+        /* 籃框區 */
+        .baskets-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .basket {
+            background-color: var(--basket-bg);
+            border: 2px solid var(--basket-border);
+            border-radius: 15px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .basket:hover {
+            transform: translateY(-5px);
+            background-color: var(--basket-hover);
+            box-shadow: 0 5px 15px rgba(233, 69, 96, 0.4);
+        }
+
+        .basket:active {
+            transform: translateY(2px);
+        }
+
+        .basket-led {
+            background-color: #000;
+            width: 100%;
+            padding: 8px;
+            text-align: center;
+            border-radius: 5px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border: 1px solid #333;
+        }
+
+        .hoop {
+            width: 70px;
+            height: 35px;
+            border: 4px solid #ff4500;
+            border-bottom: none;
+            border-radius: 35px 35px 0 0;
+            position: relative;
+        }
+
+        .hoop::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 35px;
+            background-image:
+                linear-gradient(45deg, transparent 40%, rgba(255, 255, 255, 0.4) 40%, rgba(255, 255, 255, 0.4) 60%, transparent 60%),
+                linear-gradient(-45deg, transparent 40%, rgba(255, 255, 255, 0.4) 40%, rgba(255, 255, 255, 0.4) 60%, transparent 60%);
+            background-size: 10px 10px;
+            top: 35px;
+            left: -4px;
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-radius: 0 0 15px 15px;
+            border-top: none;
+            box-sizing: content-box;
+        }
+
+        .controls {
+            margin-top: 20px;
+        }
+
+        button {
+            background-color: #0f3460;
+            color: #fff;
+            border: 2px solid #00ffcc;
+            padding: 12px 25px;
+            font-size: 1.2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background-color: #00ffcc;
+            color: #0f3460;
+            box-shadow: 0 0 15px #00ffcc;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header-links">
+        <a href="instructions.html">📖 查看遊戲說明</a>
+    </div>
+
+    <h1>🎮 環境保衛戰：8x8 矩陣版 🏀</h1>
+
+    <div class="arcade-cabinet">
+        <div class="main-screen">
+            <div class="stats-bar">
+                <div>SCORE: <span id="score">0000</span></div>
+                <div>TIME: <span id="time">30</span></div>
+            </div>
+
+            <!-- 8x8矩陣容器 -->
+            <div class="led-matrix" id="matrix">
+                <!-- 由 JavaScript 動態生成 64 個點 -->
+            </div>
+
+            <div class="item-name-display" id="itemName"></div>
+
+            <div class="overlay" id="startOverlay">
+                <h2 style="color: #00ffcc; font-size: 2rem; margin: 0 0 15px 0;">準備挑戰！</h2>
+                <p style="color: #ccc; margin-bottom: 25px;">仔細看燈板圖形，將其投入正確分類</p>
+                <button onclick="startGame()">▶ 點擊開始</button>
+            </div>
+
+            <div class="overlay" id="endOverlay" style="display: none;">
+                <h2 style="color: #ff3366; font-size: 2.5rem; margin: 0 0 15px 0;">時間到！</h2>
+                <div style="font-size: 1.5rem; margin-bottom: 20px;">最終得分：<span id="finalScore"
+                        style="color:#ffd700">0</span></div>
+                <div style="font-size: 1.2rem; margin-bottom: 20px; color:#aaa;">
+                    答對: <span id="finalCorrect" style="color:#33ff33">0</span> 題 /
+                    答錯: <span id="finalWrong" style="color:#ff3333">0</span> 題
+                </div>
+                <button onclick="resetGame()">↻ 再玩一次</button>
+            </div>
+        </div>
+
+        <!-- 籃框區 -->
+        <div class="baskets-container">
+            <div class="basket" onclick="throwBall('recycle')">
+                <div class="basket-led" style="color: #33ff33; border-color: #33ff33;">♻️ 資源回收</div>
+                <div class="hoop" style="border-color: #33ff33;"></div>
+            </div>
+            <div class="basket" onclick="throwBall('organic')">
+                <div class="basket-led" style="color: #ffee33; border-color: #ffee33;">🍎 廚餘</div>
+                <div class="hoop" style="border-color: #ffee33;"></div>
+            </div>
+            <div class="basket" onclick="throwBall('general')">
+                <div class="basket-led" style="color: #fff; border-color: #aaa;">🗑️ 一般垃圾</div>
+                <div class="hoop" style="border-color: #aaa;"></div>
+            </div>
+            <div class="basket" onclick="throwBall('hazardous')">
+                <div class="basket-led" style="color: #ff3333; border-color: #ff3333;">⚠️ 有害垃圾</div>
+                <div class="hoop" style="border-color: #ff3333;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === 1. 初始化 8x8 矩陣 DOM ===
+        const matrixEl = document.getElementById('matrix');
+        const dots = [];
+        for (let i = 0; i < 64; i++) {
+            const dot = document.createElement('div');
+            dot.className = 'led-dot';
+            matrixEl.appendChild(dot);
+            dots.push(dot);
+        }
+
+        // === 2. 定義 8x8 像素圖案庫 (1=亮, 0=暗) ===
+
+        // --- 物品圖案 ---
+        const ART_BOTTLE = [
+            0, 0, 0, 1, 1, 0, 0, 0,
+            0, 0, 0, 1, 1, 0, 0, 0,
+            0, 0, 1, 1, 1, 1, 0, 0,
+            0, 0, 1, 1, 1, 1, 0, 0,
+            0, 0, 1, 1, 1, 1, 0, 0,
+            0, 0, 1, 1, 1, 1, 0, 0,
+            0, 0, 1, 1, 1, 1, 0, 0,
+            0, 0, 0, 1, 1, 0, 0, 0
+        ]; // 寶特瓶 (blue)
+
+        const ART_APPLE = [
+            0, 0, 0, 0, 1, 0, 0, 0,
+            0, 0, 0, 1, 0, 0, 0, 0,
+            0, 0, 1, 1, 1, 1, 0, 0,
+            0, 1, 1, 1, 1, 1, 1, 0,
+            0, 1, 1, 1, 1, 1, 1, 0,
+            0, 1, 1, 1, 1, 1, 1, 0,
+            0, 0, 1, 1, 1, 1, 0, 0,
+            0, 0, 0, 1, 1, 0, 0, 0
+        ]; // 蘋果核/果皮 (red)
+
+        const ART_BATTERY = [
+            0, 0, 0, 1, 1, 0, 0, 0,
+            0, 0, 1, 1, 1, 1, 0, 0,
+            0, 0, 1, 0, 0, 1, 0, 0,
+            0, 0, 1, 0, 0, 1, 0, 0,
+            0, 0, 1, 1, 1, 1, 0, 0,
+            0, 0, 1, 1, 1, 1, 0, 0,
+            0, 0, 1, 1, 1, 1, 0, 0,
+            0, 0, 1, 1, 1, 1, 0, 0
+        ]; // 廢電池 (orange)
+
+        const ART_PAPER = [
+            0, 0, 1, 1, 1, 1, 1, 0,
+            0, 0, 1, 0, 0, 0, 1, 0,
+            0, 0, 1, 1, 1, 0, 1, 0,
+            0, 0, 1, 0, 0, 0, 1, 0,
+            0, 0, 1, 1, 1, 0, 1, 0,
+            0, 0, 1, 0, 0, 0, 1, 0,
+            0, 0, 1, 1, 1, 1, 1, 0,
+            0, 0, 0, 0, 0, 0, 0, 0
+        ]; // 廢紙/報紙 (white)
+
+        // --- 回饋動畫圖案 ---
+        const ART_TICK = [
+            0, 0, 0, 0, 0, 0, 0, 1,
+            0, 0, 0, 0, 0, 0, 1, 1,
+            0, 0, 0, 0, 0, 1, 1, 0,
+            1, 0, 0, 0, 1, 1, 0, 0,
+            1, 1, 0, 1, 1, 0, 0, 0,
+            0, 1, 1, 1, 0, 0, 0, 0,
+            0, 0, 1, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0
+        ]; // 綠色打勾 ✓
+
+        const ART_CROSS = [
+            1, 0, 0, 0, 0, 0, 0, 1,
+            0, 1, 0, 0, 0, 0, 1, 0,
+            0, 0, 1, 0, 0, 1, 0, 0,
+            0, 0, 0, 1, 1, 0, 0, 0,
+            0, 0, 0, 1, 1, 0, 0, 0,
+            0, 0, 1, 0, 0, 1, 0, 0,
+            0, 1, 0, 0, 0, 0, 1, 0,
+            1, 0, 0, 0, 0, 0, 0, 1
+        ]; // 紅色叉叉 ✗
+
+        const ART_EXPLODE_1 = [
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 1, 1, 0, 0, 0,
+            0, 0, 0, 1, 1, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0
+        ];
+
+        const ART_EXPLODE_2 = [
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 1, 0, 0, 1, 0, 0,
+            0, 1, 0, 0, 0, 0, 1, 0,
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 1, 0, 0, 0, 0, 1, 0,
+            0, 0, 1, 0, 0, 1, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0
+        ];
+
+        // --- 數字字型 (3x5) ---
+        const NUMBERS = [
+            [1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1], // 0
+            [0, 1, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 1, 1, 1], // 1
+            [1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1], // 2
+            [1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1], // 3
+            [1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1], // 4
+            [1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1], // 5
+            [1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1], // 6
+            [1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1], // 7
+            [1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1], // 8
+            [1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1]  // 9
+        ];
+
+        // 題庫設定
+        const itemsList = [
+            { name: "寶特瓶", art: ART_BOTTLE, color: "blue", category: "recycle" },
+            { name: "蘋果核", art: ART_APPLE, color: "red", category: "organic" },
+            { name: "廢電池", art: ART_BATTERY, color: "orange", category: "hazardous" },
+            { name: "舊報紙", art: ART_PAPER, color: "white", category: "recycle" },
+            { name: "香蕉皮", art: ART_APPLE, color: "yellow", category: "organic" },
+            { name: "面紙", art: ART_PAPER, color: "white", category: "general" }
+        ];
+
+        // === 3. 遊戲核心邏輯 ===
+        let score = 0;
+        let cCount = 0; // correct
+        let iCount = 0; // incorrect
+        let timeLeft = 30;
+        let isPlaying = false;
+        let currentItem = null;
+        let gameTimer = null;
+        let isAnimating = false;
+
+        const scoreEl = document.getElementById('score');
+        const timeEl = document.getElementById('time');
+        const itemNameEl = document.getElementById('itemName');
+        const startOverlay = document.getElementById('startOverlay');
+        const endOverlay = document.getElementById('endOverlay');
+
+        // 音效系統
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            if (type === 'right') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                osc.start(audioCtx.currentTime);
+                osc.stop(audioCtx.currentTime + 0.2);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 0.3);
+                gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start(audioCtx.currentTime);
+                osc.stop(audioCtx.currentTime + 0.3);
+            }
+        }
+
+        // 語音播報 (TTS)
+        const synth = window.speechSynthesis;
+        function speak(text) {
+            if (synth.speaking) synth.cancel();
+            const utterThis = new SpeechSynthesisUtterance(text);
+            utterThis.lang = 'zh-TW';
+            utterThis.rate = 1.2;
+            synth.speak(utterThis);
+        }
+
+        // 繪製矩陣函數
+        function drawMatrix(artArray, colorClass) {
+            for (let i = 0; i < 64; i++) {
+                dots[i].className = 'led-dot'; // 清除顏色
+                if (artArray && artArray[i] === 1) {
+                    dots[i].classList.add(`on-${colorClass}`);
+                }
+            }
+        }
+
+        function clearMatrix() {
+            for (let i = 0; i < 64; i++) {
+                dots[i].className = 'led-dot';
+            }
+        }
+
+        // 分數與題數播放程序 (跑馬閃爍)
+        async function flashNumberSequence(num, color, dotColor) {
+            const digits = num.toString().split('');
+            for (let i = 0; i < digits.length; i++) {
+                clearMatrix();
+                // 在左上角畫特徵屬性點
+                dots[0].classList.add(`on-${dotColor}`);
+
+                // 取出字型陣列
+                const digit = parseInt(digits[i]);
+                const nArt = NUMBERS[digit];
+
+                // 畫 3x5 數字 (平移 offset: 向右 4, 向下 1)
+                for (let r = 0; r < 5; r++) {
+                    for (let c = 0; c < 3; c++) {
+                        if (nArt[r * 3 + c] === 1) {
+                            let idx = (r + 1) * 8 + (c + 4);
+                            dots[idx].classList.add(`on-${color}`);
+                        }
+                    }
+                }
+
+                // 如果是遊戲進行中才等待 (避免遊戲中斷時卡住)
+                if (!isPlaying) return;
+                await sleep(500); // 顯示半秒
+                clearMatrix();
+                if (!isPlaying) return;
+                await sleep(100); // 停頓0.1秒
+            }
+        }
+
+        // 遊戲流程控制
+        function startGame() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            startOverlay.style.display = 'none';
+            endOverlay.style.display = 'none';
+            score = 0;
+            cCount = 0;
+            iCount = 0;
+            timeLeft = 30;
+            isPlaying = true;
+            isAnimating = false;
+            updateDisplay();
+
+            nextItem();
+
+            gameTimer = setInterval(() => {
+                timeLeft--;
+                updateDisplay();
+                if (timeLeft <= 0) endGame();
+            }, 1000);
+        }
+
+        function endGame() {
+            clearInterval(gameTimer);
+            isPlaying = false;
+            isAnimating = false;
+            clearMatrix();
+            itemNameEl.innerText = "";
+            document.getElementById('finalScore').innerText = score;
+            document.getElementById('finalCorrect').innerText = cCount;
+            document.getElementById('finalWrong').innerText = iCount;
+            endOverlay.style.display = 'flex';
+        }
+
+        function resetGame() {
+            startGame();
+        }
+
+        function nextItem() {
+            if (!isPlaying) return;
+            const idx = Math.floor(Math.random() * itemsList.length);
+            currentItem = itemsList[idx];
+
+            // 繪圖與文字顯示
+            drawMatrix(currentItem.art, currentItem.color);
+            itemNameEl.innerText = currentItem.name;
+
+            // 語音播報
+            speak(currentItem.name);
+        }
+
+        async function throwBall(basketType) {
+            if (!isPlaying || isAnimating || !currentItem) return;
+
+            isAnimating = true; // 鎖定狀態
+            itemNameEl.innerText = "統計計算中...";
+
+            if (basketType === currentItem.category) {
+                // 對的處理
+                playSound('right');
+                score += 100;
+                cCount += 1;
+                updateDisplay();
+                drawMatrix(ART_TICK, 'green');
+                await sleep(600);
+            } else {
+                // 錯的處理
+                playSound('wrong');
+                score = Math.max(0, score - 50);
+                iCount += 1;
+                updateDisplay();
+
+                // 播放爆炸動畫序列
+                drawMatrix(ART_CROSS, 'red');
+                await sleep(300);
+                drawMatrix(ART_EXPLODE_1, 'yellow');
+                await sleep(150);
+                drawMatrix(ART_EXPLODE_2, 'red');
+                await sleep(150);
+                clearMatrix();
+                await sleep(100);
+                drawMatrix(ART_EXPLODE_2, 'red');
+                await sleep(150);
+            }
+
+            // 進入 LED 動態戰況播報程序
+            if (isPlaying) {
+                // 1. 顯示目前答對數量 (左上綠點，淺藍字)
+                itemNameEl.innerText = `答對: ${cCount}`;
+                await flashNumberSequence(cCount, 'blue', 'green');
+
+                // 2. 顯示目前答錯數量 (左上紅點，淺藍字)
+                itemNameEl.innerText = `答錯: ${iCount}`;
+                await flashNumberSequence(iCount, 'blue', 'red');
+
+                // 3. 顯示目前得分 (左上黃點，白字)
+                itemNameEl.innerText = `得分: ${score}`;
+                await flashNumberSequence(score, 'white', 'yellow');
+            }
+
+            isAnimating = false;
+            if (isPlaying) {
+                nextItem(); // 出下一題
+            }
+        }
+
+        function updateDisplay() {
+            scoreEl.innerText = score.toString().padStart(4, '0');
+            timeEl.innerText = timeLeft.toString().padStart(2, '0');
+            if (timeLeft <= 10) timeEl.style.color = '#ff3333';
+            else timeEl.style.color = '#ffd700';
+        }
+
+        // 等待函數
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        clearMatrix();
+
+    </script>
+</body>
+
+</html>
