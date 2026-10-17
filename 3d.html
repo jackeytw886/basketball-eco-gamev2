@@ -197,9 +197,104 @@
             box-shadow: 0 0 18px var(--c);
         }
 
+        .pad-btn.aim {
+            background: #1f2b52;
+            box-shadow: 0 0 0 3px var(--c), 0 0 16px var(--c);
+        }
+
+        header button.on {
+            background: var(--cyan);
+            color: var(--bg);
+        }
+
+        /* ===== 攝影機面板 ===== */
+        #camPanel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 6;
+            width: min(300px, 40vw, calc((100vh - 250px) * 1.33));
+            width: min(300px, 40vw, calc((100dvh - 250px) * 1.33));
+            min-width: 150px;
+            background: rgba(10, 10, 26, .88);
+            border: 1px solid rgba(0, 255, 204, .45);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, .6);
+        }
+
+        #camPanel[hidden] { display: none; }
+
+        #stage.cam-open #busyChip { left: 10px; transform: none; }
+
+        .cam-view {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            background: #000;
+        }
+
+        .cam-view video, .cam-view canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .cam-view video {
+            object-fit: fill;
+            transform: scaleX(-1);   /* 鏡像，像照鏡子 */
+        }
+
+        #camStatus {
+            padding: 6px 8px;
+            font-size: .82rem;
+            line-height: 1.4;
+            color: #cfe;
+            min-height: 3.2em;
+        }
+
+        #camStatus.shot { color: var(--gold); font-weight: 700; }
+        #camStatus.warn { color: #ff8a8a; }
+
+        .cam-opts {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0 8px 8px;
+            font-size: .75rem;
+            color: #9ab;
+            flex-wrap: wrap;
+        }
+
+        .cam-opts select {
+            background: #16213e;
+            color: #fff;
+            border: 1px solid #3a4a7a;
+            border-radius: 4px;
+            font: inherit;
+            padding: 2px 4px;
+        }
+
+        .cam-opts button {
+            margin-left: auto;
+            background: transparent;
+            color: #9ab;
+            border: 1px solid #3a4a7a;
+            border-radius: 4px;
+            font: inherit;
+            padding: 2px 8px;
+            cursor: pointer;
+        }
+
+        .cam-hint { color: var(--gold); margin: 0 0 18px !important; }
+
         @media (max-width: 420px) {
             header h1 { font-size: .95rem; }
             .pad-btn { font-size: .82rem; }
+            #camPanel { width: 46vw; top: 6px; right: 6px; }
+            #camStatus { font-size: .72rem; }
+            .cam-opts { font-size: .68rem; }
         }
     </style>
 </head>
@@ -208,18 +303,44 @@
     <div id="app">
         <header>
             <h1>🏀 環境保衛戰：3D 模擬版</h1>
+            <button id="btnCam" type="button">📷 攝影機</button>
             <button id="btnView" type="button">重設視角</button>
             <a href="index.html">2D 原版</a>
         </header>
 
         <div id="stage">
             <div class="chip" id="busyChip">⏸ 播報中・計時暫停</div>
-            <div class="chip" id="hintChip">點籃框或下方按鈕投籃・鍵盤 1–4・拖曳旋轉視角</div>
+            <div class="chip" id="hintChip">點籃框或下方按鈕投籃・鍵盤 1–4・📷 可用攝影機投籃</div>
+
+            <div id="camPanel" hidden>
+                <div class="cam-view">
+                    <video id="camVideo" playsinline muted></video>
+                    <canvas id="camCanvas"></canvas>
+                </div>
+                <div id="camStatus">準備攝影機…</div>
+                <div class="cam-opts">
+                    <label>瞄準
+                        <select id="aimMode">
+                            <option value="body">站的位置</option>
+                            <option value="hand">手的位置</option>
+                        </select>
+                    </label>
+                    <label>靈敏度
+                        <select id="sensSel">
+                            <option value="high">高</option>
+                            <option value="mid" selected>中</option>
+                            <option value="low">低</option>
+                        </select>
+                    </label>
+                    <button id="camClose" type="button">關閉</button>
+                </div>
+            </div>
 
             <div class="overlay" id="startOverlay">
                 <h2 style="color:#00ffcc">準備挑戰！</h2>
                 <p>仔細看燈板圖形，將其投入正確分類</p>
                 <p class="rules">答對 +100・答錯 −50・限時 30 秒<br>每球播報時計時暫停</p>
+                <p class="cam-hint" hidden>📷 攝影機已開啟：舉起雙手 1 秒也能開始</p>
                 <button class="big-btn" id="btnStart" type="button" disabled>載入 3D 引擎中…</button>
             </div>
 
@@ -230,6 +351,7 @@
                     答對：<span id="finalCorrect" style="color:#33ff33">0</span> 題 ／
                     答錯：<span id="finalWrong" style="color:#ff3333">0</span> 題
                 </div>
+                <p class="cam-hint" hidden>📷 舉起雙手 1 秒再玩一次</p>
                 <button class="big-btn" id="btnRetry" type="button">↻ 再玩一次</button>
             </div>
         </div>
@@ -768,6 +890,9 @@
                     c = Math.floor(t * 8) % 2 === 0 ? RED : OFF_COLOR;
                 } else if (h.mode === 'hint') {
                     c = Math.floor(t * 5) % 2 === 0 ? h.col : OFF_COLOR;
+                } else if (cam.on && cam.present && cam.aim === h.index) {
+                    // 攝影機瞄準中的籃框：整圈亮起並呼吸閃爍
+                    c = tmpCol.copy(h.col).multiplyScalar(0.55 + 0.45 * (0.5 + 0.5 * Math.sin(now / 110)));
                 } else {
                     const d = (head - i + RING_N) % RING_N;
                     const k = d < 7 ? 1 - d / 7 : 0;
@@ -821,10 +946,19 @@
             const [x0, x1, y0, y1] = layout.bounds;
             const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
             const hw = (x1 - x0) / 2 + 0.45, hh = (y1 - y0) / 2 + 0.45;
+            // 開啟攝影機面板時讓出空間：直向讓出上方、矮的橫向畫面讓出右側
+            let f = 0, g = 0;
+            if (cam.panel) {
+                const sw = stage.clientWidth, sh = stage.clientHeight;
+                if (layoutName === 'port') f = Math.min(0.5, (camPanel.offsetHeight + 14) / sh);
+                else if (sh < 480) g = Math.min(0.45, (camPanel.offsetWidth + 14) / sw);
+            }
             const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
-            const d = Math.max(hh / tanV, hw / (tanV * camera.aspect)) + 0.6;
-            camera.position.set(cx, cy - d * 0.12, d);
-            controls.target.set(cx, cy, 0);
+            const tanH = tanV * camera.aspect;
+            const d = Math.max(hh / (tanV * (1 - f)), hw / (tanH * (1 - g))) + 0.6;
+            const tx = cx + g * tanH * d, ty = cy + f * tanV * d;
+            camera.position.set(tx, ty - d * 0.12, d);
+            controls.target.set(tx, ty, 0);
             controls.minDistance = d * 0.5;
             controls.maxDistance = d * 1.6;
             controls.update();
@@ -881,9 +1015,9 @@
         const shadowGeo = new THREE.PlaneGeometry(0.5, 0.5).rotateX(-Math.PI / 2);
         const balls = [];
 
-        function launchBall(hoop) {
+        function launchBall(hoop, srcX = 0) {
             return new Promise(resolve => {
-                const S = camera.localToWorld(new THREE.Vector3(0, -0.55, -2.2));
+                const S = camera.localToWorld(new THREE.Vector3(srcX, -0.55, -2.2));
                 const R = hoop.rimWorld.clone();
                 R.y += 0.06;
                 const dist = S.distanceTo(R);
@@ -1133,7 +1267,7 @@
             }
         }
 
-        async function throwBall(catId) {
+        async function throwBall(catId, srcX = 0) {
             if (!isPlaying || isAnimating || !currentItem) return;
             setBusy(true);
             const hoop = hoopById[catId];
@@ -1141,7 +1275,7 @@
             flashPad(catId);
             setName('投籃中…');
 
-            await launchBall(hoop);           // 球穿過籃網時才判定
+            await launchBall(hoop, srcX);     // 球穿過籃網時才判定
             if (!isPlaying) { setBusy(false); return; }
 
             if (catId === item.category) {
@@ -1243,7 +1377,352 @@
         });
 
         // =====================================================
-        // 11. 主迴圈
+        // 11. 攝影機投籃偵測（MediaPipe Pose Landmarker）
+        // =====================================================
+        const MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/';
+        const POSE_MODEL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+        // 靈敏度：win＝手從肩膀以下推過「投籃線」允許的秒數；over＝投籃線高出鼻子多少（單位：肩寬）
+        const SENS = {
+            high: { win: 0.75, over: 0.25 },
+            mid: { win: 0.5, over: 0.45 },
+            low: { win: 0.35, over: 0.65 }
+        };
+        const camVideo = document.getElementById('camVideo');
+        const camCanvas = document.getElementById('camCanvas');
+        const camCtx = camCanvas.getContext('2d');
+        const camStatus = document.getElementById('camStatus');
+        const camPanel = document.getElementById('camPanel');
+        const btnCam = document.getElementById('btnCam');
+        const aimModeSel = document.getElementById('aimMode');
+        const sensSel = document.getElementById('sensSel');
+        const cam = {
+            panel: false, on: false, ready: false, landmarker: null, loading: null, stream: null,
+            lastVideoTime: -1, lastDetect: 0, present: false, aim: -1, aimX: null,
+            lastShot: 0, bothUpSince: 0, msgUntil: 0, lastPose: null, lastMetrics: null,
+            wrists: [{ armedAt: -1e9, cool: true, rel: 0 }, { armedAt: -1e9, cool: true, rel: 0 }]
+        };
+
+        let statusText = '', statusCls = '';
+        function setCamStatus(text, cls = '', holdMs = 0) {
+            const now = performance.now();
+            if (!holdMs && now < cam.msgUntil) return;   // 保留剛剛的重要訊息一下子
+            if (holdMs) cam.msgUntil = now + holdMs;
+            if (text === statusText && cls === statusCls) return;
+            statusText = text;
+            statusCls = cls;
+            camStatus.textContent = text;
+            camStatus.className = cls;
+        }
+
+        let padAim = -2;
+        function updatePadAim() {
+            const a = cam.on && cam.present ? cam.aim : -1;
+            if (a === padAim) return;
+            padAim = a;
+            document.querySelectorAll('.pad-btn').forEach((b, i) => b.classList.toggle('aim', i === a));
+        }
+
+        function refreshCamUI() {
+            document.querySelectorAll('.cam-hint').forEach(p => { p.hidden = !cam.on; });
+            btnCam.classList.toggle('on', cam.panel);
+            stage.classList.toggle('cam-open', cam.panel);
+            updatePadAim();
+        }
+
+        function openPanel() {
+            cam.panel = true;
+            camPanel.hidden = false;
+            refreshCamUI();
+            fitCamera();
+            drawCamOverlay();
+        }
+
+        async function loadLandmarker() {
+            const vision = await import(MP_BASE + 'vision_bundle.mjs');
+            const fileset = await vision.FilesetResolver.forVisionTasks(MP_BASE + 'wasm');
+            const opts = (delegate) => ({
+                baseOptions: { modelAssetPath: POSE_MODEL, delegate },
+                runningMode: 'VIDEO',
+                numPoses: 1,
+                minPoseDetectionConfidence: 0.5,
+                minPosePresenceConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+            try {
+                return await vision.PoseLandmarker.createFromOptions(fileset, opts('GPU'));
+            } catch (err) {
+                console.warn('GPU 模式失敗，改用 CPU', err);
+                return await vision.PoseLandmarker.createFromOptions(fileset, opts('CPU'));
+            }
+        }
+
+        async function startCamera() {
+            audio();                       // 借這次點擊解鎖音效與語音
+            openPanel();
+            if (!window.isSecureContext) {
+                setCamStatus('攝影機需要 HTTPS 網址才能使用（GitHub Pages 網址可以）', 'warn', 1e9);
+                return;
+            }
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                setCamStatus('這個瀏覽器不支援攝影機，請改用 Chrome 或 Edge', 'warn', 1e9);
+                return;
+            }
+            setCamStatus('請允許使用攝影機…');
+            try {
+                cam.stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+                    audio: false
+                });
+            } catch (err) {
+                const name = err && err.name;
+                setCamStatus(
+                    name === 'NotAllowedError' ? '攝影機權限被拒絕，請在網址列允許攝影機後再按一次 📷'
+                        : name === 'NotFoundError' ? '找不到攝影機'
+                            : name === 'NotReadableError' ? '攝影機被其他程式佔用中'
+                                : '無法開啟攝影機：' + (err && err.message || err), 'warn', 1e9);
+                return;
+            }
+            if (!cam.panel) { stopTracks(); return; }   // 等權限時已關閉
+            camVideo.srcObject = cam.stream;
+            await camVideo.play().catch(() => { });
+            if (camVideo.readyState < 1) {
+                await new Promise(r => camVideo.addEventListener('loadedmetadata', r, { once: true }));
+            }
+            const vw = camVideo.videoWidth || 640, vh = camVideo.videoHeight || 480;
+            document.querySelector('.cam-view').style.aspectRatio = vw + ' / ' + vh;
+            cam.on = true;
+            refreshCamUI();
+            fitCamera();
+
+            if (!cam.landmarker) {
+                setCamStatus('載入姿勢辨識模型中（第一次約需 10–20 秒）…');
+                try {
+                    cam.landmarker = await (cam.loading || (cam.loading = loadLandmarker()));
+                } catch (err) {
+                    cam.loading = null;
+                    console.error(err);
+                    setCamStatus('姿勢辨識模型載入失敗，請確認網路後再按一次 📷', 'warn', 1e9);
+                    return;
+                }
+            }
+            if (!cam.on) return;
+            cam.ready = true;
+            cam.lastVideoTime = -1;
+            setCamStatus('請站到鏡頭前，讓上半身入鏡');
+        }
+
+        function stopTracks() {
+            if (cam.stream) cam.stream.getTracks().forEach(t => t.stop());
+            cam.stream = null;
+        }
+
+        function stopCamera() {
+            stopTracks();
+            camVideo.srcObject = null;
+            Object.assign(cam, { panel: false, on: false, ready: false, present: false, aim: -1, aimX: null, msgUntil: 0, lastPose: null, lastMetrics: null, bothUpSince: 0 });
+            camPanel.hidden = true;
+            refreshCamUI();
+            fitCamera();
+        }
+
+        // 每一幀骨架 → 瞄準與投籃判定
+        function processPose(lm, now, ar) {
+            cam.lastPose = lm;
+            const vis = (i) => !!(lm && lm[i] && (lm[i].visibility === undefined || lm[i].visibility > 0.5));
+            if (!lm || !vis(11) || !vis(12)) {
+                Object.assign(cam, { present: false, aimX: null, bothUpSince: 0, lastMetrics: null });
+                setCamStatus(lm ? '請讓雙肩入鏡' : '請站到鏡頭前，讓上半身入鏡');
+                updatePadAim();
+                return;
+            }
+            const ls = lm[11], rs = lm[12];
+            const S = Math.hypot((ls.x - rs.x) * ar, ls.y - rs.y);   // 肩寬（以畫面高為單位）
+            const shX = (ls.x + rs.x) / 2, shY = (ls.y + rs.y) / 2;
+            if (S < 0.06) {
+                cam.present = false;
+                setCamStatus('離鏡頭太遠了，請靠近一點');
+                updatePadAim();
+                return;
+            }
+            cam.present = true;
+            const noseRel = vis(0) ? (shY - lm[0].y) / S : 0.7;
+            const sens = SENS[sensSel.value] || SENS.mid;
+            const shotLine = noseRel + sens.over;
+
+            // 瞄準：鏡像畫面分成四欄，左→右對應 1～4 號籃框
+            let srcX = 1 - shX;
+            if (aimModeSel.value === 'hand') {
+                const ws = [15, 16].filter(vis);
+                if (ws.length) {
+                    const w = ws.reduce((a, b) => (lm[a].y < lm[b].y ? a : b));
+                    srcX = 1 - lm[w].x;
+                }
+            }
+            cam.aimX = cam.aimX == null ? srcX : cam.aimX + (srcX - cam.aimX) * 0.35;
+            const raw = THREE.MathUtils.clamp(Math.floor(cam.aimX * 4), 0, 3);
+            if (cam.aim < 0 || (raw !== cam.aim && Math.abs(cam.aimX - (cam.aim + 0.5) / 4) > 0.15)) cam.aim = raw;
+            updatePadAim();
+
+            // 投籃動作：手腕先在肩膀以下（預備），接著在時限內快速推過投籃線
+            let shot = false;
+            const rels = [null, null];
+            [[15, 13], [16, 14]].forEach(([wi, ei], k) => {
+                const st = cam.wrists[k];
+                if (!vis(wi)) return;
+                const rel = (shY - lm[wi].y) / S;
+                const elbowRel = vis(ei) ? (shY - lm[ei].y) / S : rel * 0.5;
+                rels[k] = rel;
+                st.rel = rel;
+                if (rel < 0.25) {
+                    st.armedAt = now;
+                    st.cool = false;
+                } else if (!st.cool && rel > shotLine && elbowRel > 0.2 && now - st.armedAt < sens.win * 1000) {
+                    st.cool = true;            // 手放低後才能再投下一球
+                    shot = true;
+                }
+            });
+            cam.lastMetrics = { S, shY, shotLine };
+
+            // 遊戲還沒開始：舉起雙手 1 秒開始
+            if (!isPlaying) {
+                const bothUp = rels[0] !== null && rels[1] !== null && rels[0] > noseRel + 0.2 && rels[1] > noseRel + 0.2;
+                if (bothUp) {
+                    if (!cam.bothUpSince) cam.bothUpSince = now;
+                    const left = 1 - (now - cam.bothUpSince) / 1000;
+                    if (left <= 0) {
+                        cam.bothUpSince = 0;
+                        startGame();
+                        setCamStatus('遊戲開始！', 'shot', 900);
+                    } else {
+                        setCamStatus('雙手舉著…再 ' + left.toFixed(1) + ' 秒', 'shot');
+                    }
+                } else {
+                    cam.bothUpSince = 0;
+                    setCamStatus('舉起雙手 1 秒開始遊戲');
+                }
+                return;
+            }
+            cam.bothUpSince = 0;
+
+            const cat = CATEGORIES[cam.aim];
+            if (shot && now - cam.lastShot > 800) {
+                cam.lastShot = now;
+                if (isAnimating) {
+                    setCamStatus('播報中，等下一題再投', 'warn', 800);
+                } else {
+                    setCamStatus('🏀 投籃！→ ' + cat.emoji + ' ' + cat.name, 'shot', 1200);
+                    throwBall(cat.id, (cam.aimX - 0.5) * 1.6);
+                }
+                return;
+            }
+            if (isAnimating) {
+                setCamStatus('播報中…');
+            } else {
+                const low = Math.min(rels[0] ?? 9, rels[1] ?? 9) < 0.25;
+                setCamStatus('瞄準 ' + cat.emoji + ' ' + cat.name + (low ? '・手往上快速一推就投籃' : '・手先放到肩膀以下'));
+            }
+        }
+
+        const hexA = (hex, a) => {
+            const n = parseInt(hex.slice(1), 16);
+            return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')';
+        };
+
+        function drawCamOverlay() {
+            const w = camCanvas.clientWidth, h = camCanvas.clientHeight;
+            if (!w || !h) return;
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            if (camCanvas.width !== Math.round(w * dpr) || camCanvas.height !== Math.round(h * dpr)) {
+                camCanvas.width = Math.round(w * dpr);
+                camCanvas.height = Math.round(h * dpr);
+            }
+            const g = camCtx;
+            g.setTransform(dpr, 0, 0, dpr, 0, 0);
+            g.clearRect(0, 0, w, h);
+
+            // 四欄瞄準區
+            g.textAlign = 'center';
+            g.textBaseline = 'top';
+            g.font = 'bold ' + Math.max(10, Math.round(w / 22)) + 'px sans-serif';
+            CATEGORIES.forEach((c, i) => {
+                const on = cam.present && cam.aim === i;
+                g.fillStyle = hexA(c.color, on ? 0.3 : 0.07);
+                g.fillRect(i * w / 4, 0, w / 4, h);
+                g.fillStyle = hexA(c.color, on ? 1 : 0.65);
+                g.fillText(c.emoji + (i + 1), (i + 0.5) * w / 4, 4);
+            });
+            g.strokeStyle = 'rgba(255,255,255,0.22)';
+            g.lineWidth = 1;
+            for (let i = 1; i < 4; i++) {
+                g.beginPath(); g.moveTo(i * w / 4, 0); g.lineTo(i * w / 4, h); g.stroke();
+            }
+
+            const lm = cam.lastPose, m = cam.lastMetrics;
+            if (!lm) return;
+            const vis = (i) => lm[i] && (lm[i].visibility === undefined || lm[i].visibility > 0.5);
+            const P = (i) => [(1 - lm[i].x) * w, lm[i].y * h];
+
+            // 骨架
+            g.strokeStyle = 'rgba(0,255,204,0.9)';
+            g.lineWidth = 3;
+            g.lineCap = 'round';
+            [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24]].forEach(([a, b]) => {
+                if (!vis(a) || !vis(b)) return;
+                const pa = P(a), pb = P(b);
+                g.beginPath(); g.moveTo(pa[0], pa[1]); g.lineTo(pb[0], pb[1]); g.stroke();
+            });
+            if (vis(0)) {
+                const [x, y] = P(0);
+                g.fillStyle = 'rgba(255,255,255,0.8)';
+                g.beginPath(); g.arc(x, y, Math.max(4, w / 50), 0, Math.PI * 2); g.fill();
+            }
+
+            // 投籃線
+            if (m) {
+                const y = (m.shY - m.shotLine * m.S) * h;
+                g.setLineDash([6, 5]);
+                g.strokeStyle = 'rgba(255,215,0,0.95)';
+                g.lineWidth = 2;
+                g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke();
+                g.setLineDash([]);
+                g.fillStyle = '#ffd700';
+                g.textAlign = 'right';
+                g.textBaseline = 'bottom';
+                g.font = 'bold ' + Math.max(10, Math.round(w / 26)) + 'px sans-serif';
+                g.fillText('投籃線', w - 4, y - 2);
+            }
+
+            // 手腕：青色＝預備、白色＝上推中、金色＝超過投籃線
+            [15, 16].forEach((wi, k) => {
+                if (!vis(wi)) return;
+                const [x, y] = P(wi);
+                const rel = cam.wrists[k].rel;
+                g.fillStyle = m && rel > m.shotLine ? '#ffd700' : rel < 0.25 ? '#00ffcc' : '#ffffff';
+                g.beginPath(); g.arc(x, y, Math.max(6, w / 34), 0, Math.PI * 2); g.fill();
+            });
+        }
+
+        function detectPose(now) {
+            if (!cam.ready || camVideo.readyState < 2) return;
+            if (now - cam.lastDetect < 33 || camVideo.currentTime === cam.lastVideoTime) return;
+            cam.lastDetect = now;
+            cam.lastVideoTime = camVideo.currentTime;
+            try {
+                const res = cam.landmarker.detectForVideo(camVideo, now);
+                const lm = res && res.landmarks && res.landmarks[0] ? res.landmarks[0] : null;
+                processPose(lm, now, (camVideo.videoWidth || 4) / (camVideo.videoHeight || 3));
+            } catch (err) {
+                console.error(err);
+            }
+            drawCamOverlay();
+        }
+
+        btnCam.addEventListener('click', () => { if (cam.panel) stopCamera(); else startCamera(); });
+        document.getElementById('camClose').addEventListener('click', stopCamera);
+        aimModeSel.addEventListener('change', () => { cam.aimX = null; cam.aim = -1; });
+
+        // =====================================================
+        // 12. 主迴圈
         // =====================================================
         let last = performance.now();
         renderer.setAnimationLoop(() => {
@@ -1260,6 +1739,7 @@
                 if (timeLeft <= 0) endGame();
             }
 
+            detectPose(now);
             updateBalls(dt);
             updateNets(dt);
             for (const h of hoops) updateRing(h, now);
@@ -1283,7 +1763,17 @@
         window.__eco = {
             state: () => ({ score, cCount, iCount, timeLeft, isPlaying, isAnimating, item: currentItem && currentItem.name, layout: layoutName }),
             setTime: (t) => { timeLeft = t; },
-            rings: () => hoops.map(h => h.mode)
+            rings: () => hoops.map(h => h.mode),
+            // 模擬攝影機骨架（測試投籃判定用）
+            simPose: (lm, t) => {
+                if (!cam.panel) openPanel();
+                cam.on = true;
+                refreshCamUI();
+                processPose(lm, t === undefined ? performance.now() : t, 4 / 3);
+                drawCamOverlay();
+                return { aim: cam.aim, present: cam.present, status: statusText, wrists: cam.wrists.map(w => ({ cool: w.cool, rel: +w.rel.toFixed(2) })) };
+            },
+            camState: () => ({ panel: cam.panel, on: cam.on, ready: cam.ready, aim: cam.aim, present: cam.present, status: statusText })
         };
     </script>
 </body>
