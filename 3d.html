@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>環境保衛戰：3D 模擬版</title>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --bar: #12122a;
+            --line: #2a2a4a;
+            --accent: #e94560;
+            --cyan: #00ffcc;
+            --gold: #ffd700;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            height: 100%;
+            background: var(--bg);
+            color: #fff;
+            font-family: 'Segoe UI', 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', sans-serif;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            height: 100dvh;
+        }
+
+        header {
+            flex: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            padding-top: max(8px, env(safe-area-inset-top));
+            background: var(--bar);
+            border-bottom: 1px solid var(--line);
+        }
+
+        header h1 {
+            flex: 1;
+            margin: 0;
+            font-size: 1.05rem;
+            color: var(--accent);
+            text-shadow: 0 0 8px var(--accent);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        header a, header button {
+            color: var(--cyan);
+            background: transparent;
+            border: 1px solid var(--cyan);
+            border-radius: 6px;
+            padding: 5px 10px;
+            font: inherit;
+            font-size: .85rem;
+            font-weight: 600;
+            text-decoration: none;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all .2s;
+        }
+
+        header a:hover, header button:hover {
+            background: var(--cyan);
+            color: var(--bg);
+        }
+
+        #stage {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            background: #0b0b1a;
+        }
+
+        #stage canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            cursor: grab;
+        }
+
+        .overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+            background: rgba(5, 5, 15, .78);
+        }
+
+        .overlay h2 { margin: 0 0 12px; font-size: 2rem; }
+        .overlay p { margin: 0 0 8px; color: #ccc; line-height: 1.6; }
+        .overlay .rules { font-size: .9rem; color: #9aa; margin-bottom: 22px; }
+
+        .big-btn {
+            background: #0f3460;
+            color: #fff;
+            border: 2px solid var(--cyan);
+            border-radius: 8px;
+            padding: 12px 26px;
+            font: inherit;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all .3s;
+        }
+
+        .big-btn:hover:not(:disabled) {
+            background: var(--cyan);
+            color: #0f3460;
+            box-shadow: 0 0 15px var(--cyan);
+        }
+
+        .big-btn:disabled { opacity: .5; cursor: wait; }
+
+        .chip {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 4;
+            padding: 5px 12px;
+            border-radius: 999px;
+            font-size: .82rem;
+            white-space: nowrap;
+            pointer-events: none;
+            transition: opacity .4s;
+        }
+
+        #busyChip {
+            top: 10px;
+            color: var(--gold);
+            background: rgba(0, 0, 0, .6);
+            border: 1px solid rgba(255, 215, 0, .5);
+            opacity: 0;
+        }
+
+        #hintChip {
+            bottom: 10px;
+            color: #cfe;
+            background: rgba(0, 0, 0, .55);
+            border: 1px solid rgba(0, 255, 204, .35);
+        }
+
+        #pad {
+            flex: none;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            padding: 10px;
+            padding-bottom: max(10px, env(safe-area-inset-bottom));
+            background: var(--bar);
+            border-top: 1px solid var(--line);
+        }
+
+        .pad-btn {
+            --c: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            padding: 8px 2px;
+            color: var(--c);
+            background: #16213e;
+            border: 2px solid var(--c);
+            border-radius: 12px;
+            font: inherit;
+            font-size: .95rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform .12s, background .2s, box-shadow .2s;
+        }
+
+        .pad-btn .emo { font-size: 1.25rem; line-height: 1; }
+        .pad-btn .k { font-size: .68rem; opacity: .6; font-family: monospace; }
+
+        .pad-btn:hover { box-shadow: 0 0 12px var(--c); }
+
+        .pad-btn:active, .pad-btn.hit {
+            transform: translateY(2px);
+            background: #24305a;
+            box-shadow: 0 0 18px var(--c);
+        }
+
+        @media (max-width: 420px) {
+            header h1 { font-size: .95rem; }
+            .pad-btn { font-size: .82rem; }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <header>
+            <h1>🏀 環境保衛戰：3D 模擬版</h1>
+            <button id="btnView" type="button">重設視角</button>
+            <a href="index.html">2D 原版</a>
+        </header>
+
+        <div id="stage">
+            <div class="chip" id="busyChip">⏸ 播報中・計時暫停</div>
+            <div class="chip" id="hintChip">點籃框或下方按鈕投籃・鍵盤 1–4・拖曳旋轉視角</div>
+
+            <div class="overlay" id="startOverlay">
+                <h2 style="color:#00ffcc">準備挑戰！</h2>
+                <p>仔細看燈板圖形，將其投入正確分類</p>
+                <p class="rules">答對 +100・答錯 −50・限時 30 秒<br>每球播報時計時暫停</p>
+                <button class="big-btn" id="btnStart" type="button" disabled>載入 3D 引擎中…</button>
+            </div>
+
+            <div class="overlay" id="endOverlay" style="display:none">
+                <h2 style="color:#ff3366;font-size:2.5rem">時間到！</h2>
+                <div style="font-size:1.5rem;margin-bottom:16px">最終得分：<span id="finalScore" style="color:#ffd700">0</span></div>
+                <div style="font-size:1.15rem;margin-bottom:22px;color:#aaa">
+                    答對：<span id="finalCorrect" style="color:#33ff33">0</span> 題 ／
+                    答錯：<span id="finalWrong" style="color:#ff3333">0</span> 題
+                </div>
+                <button class="big-btn" id="btnRetry" type="button">↻ 再玩一次</button>
+            </div>
+        </div>
+
+        <nav id="pad">
+            <button class="pad-btn" data-cat="recycle" style="--c:#33ff33" type="button"><span class="emo">♻️</span>資源回收<span class="k">1</span></button>
+            <button class="pad-btn" data-cat="organic" style="--c:#ffee33" type="button"><span class="emo">🍎</span>廚餘<span class="k">2</span></button>
+            <button class="pad-btn" data-cat="general" style="--c:#dddddd" type="button"><span class="emo">🗑️</span>一般垃圾<span class="k">3</span></button>
+            <button class="pad-btn" data-cat="hazardous" style="--c:#ff3333" type="button"><span class="emo">⚠️</span>有害垃圾<span class="k">4</span></button>
+        </nav>
+    </div>
+
+    <!-- 3D 引擎載入失敗時的提示 -->
+    <script>
+        setTimeout(function () {
+            if (!window.__ecoBoot) {
+                var b = document.getElementById('btnStart');
+                b.textContent = '3D 引擎載入失敗，請確認網路後重新整理';
+            }
+        }, 12000);
+    </script>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+        // =====================================================
+        // 1. 8x8 像素圖案庫（1=亮, 0=暗）— 沿用 2D 版，並補上香蕉皮、面紙、鋁罐、口罩專屬圖
+        // =====================================================
+        const ART = {
+            BOTTLE: [ // 寶特瓶
+                0, 0, 0, 1, 1, 0, 0, 0,
+                0, 0, 0, 1, 1, 0, 0, 0,
+                0, 0, 1, 1, 1, 1, 0, 0,
+                0, 0, 1, 1, 1, 1, 0, 0,
+                0, 0, 1, 1, 1, 1, 0, 0,
+                0, 0, 1, 1, 1, 1, 0, 0,
+                0, 0, 1, 1, 1, 1, 0, 0,
+                0, 0, 0, 1, 1, 0, 0, 0],
+            APPLE: [ // 蘋果核
+                0, 0, 0, 0, 1, 0, 0, 0,
+                0, 0, 0, 1, 0, 0, 0, 0,
+                0, 0, 1, 1, 1, 1, 0, 0,
+                0, 1, 1, 1, 1, 1, 1, 0,
+                0, 1, 1, 1, 1, 1, 1, 0,
+                0, 1, 1, 1, 1, 1, 1, 0,
+                0, 0, 1, 1, 1, 1, 0, 0,
+                0, 0, 0, 1, 1, 0, 0, 0],
+            BATTERY: [ // 廢電池
+                0, 0, 0, 1, 1, 0, 0, 0,
+                0, 0, 1, 1, 1, 1, 0, 0,
+                0, 0, 1, 0, 0, 1, 0, 0,
+                0, 0, 1, 0, 0, 1, 0, 0,
+                0, 0, 1, 1, 1, 1, 0, 0,
+                0, 0, 1, 1, 1, 1, 0, 0,
+                0, 0, 1, 1, 1, 1, 0, 0,
+                0, 0, 1, 1, 1, 1, 0, 0],
+            PAPER: [ // 舊報紙
+                0, 0, 1, 1, 1, 1, 1, 0,
+                0, 0, 1, 0, 0, 0, 1, 0,
+                0, 0, 1, 1, 1, 0, 1, 0,
+                0, 0, 1, 0, 0, 0, 1, 0,
+                0, 0, 1, 1, 1, 0, 1, 0,
+                0, 0, 1, 0, 0, 0, 1, 0,
+                0, 0, 1, 1, 1, 1, 1, 0,
+                0, 0, 0, 0, 0, 0, 0, 0],
+            BANANA: [ // 香蕉皮
+                0, 0, 0, 0, 0, 0, 1, 1,
+                0, 0, 0, 0, 0, 0, 1, 0,
+                0, 0, 0, 0, 0, 1, 1, 0,
+                0, 0, 0, 0, 0, 1, 1, 0,
+                0, 0, 0, 0, 1, 1, 1, 0,
+                0, 0, 1, 1, 1, 1, 0, 0,
+                1, 1, 1, 1, 1, 0, 0, 0,
+                0, 1, 1, 1, 0, 0, 0, 0],
+            TISSUE: [ // 面紙（盒）
+                0, 0, 0, 1, 1, 0, 0, 0,
+                0, 0, 1, 1, 1, 1, 0, 0,
+                0, 0, 0, 1, 1, 0, 0, 0,
+                1, 1, 1, 1, 1, 1, 1, 1,
+                1, 0, 0, 0, 0, 0, 0, 1,
+                1, 0, 0, 0, 0, 0, 0, 1,
+                1, 0, 0, 0, 0, 0, 0, 1,
+                1, 1, 1, 1, 1, 1, 1, 1],
+            CAN: [ // 鋁罐
+                0, 0, 1, 1, 1, 1, 0, 0,
+                0, 1, 1, 1, 1, 1, 1, 0,
+                0, 1, 0, 0, 0, 0, 1, 0,
+                0, 1, 1, 1, 1, 1, 1, 0,
+                0, 1, 1, 1, 1, 1, 1, 0,
+                0, 1, 0, 0, 0, 0, 1, 0,
+                0, 1, 1, 1, 1, 1, 1, 0,
+                0, 0, 1, 1, 1, 1, 0, 0],
+            MASK: [ // 口罩
+                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 1, 1, 1, 1, 1, 1, 0,
+                1, 1, 0, 0, 0, 0, 1, 1,
+                1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 0, 0, 0, 0, 1, 1,
+                1, 1, 1, 1, 1, 1, 1, 1,
+                0, 1, 1, 1, 1, 1, 1, 0,
+                0, 0, 0, 0, 0, 0, 0, 0],
+            TICK: [ // ✓
+                0, 0, 0, 0, 0, 0, 0, 1,
+                0, 0, 0, 0, 0, 0, 1, 1,
+                0, 0, 0, 0, 0, 1, 1, 0,
+                1, 0, 0, 0, 1, 1, 0, 0,
+                1, 1, 0, 1, 1, 0, 0, 0,
+                0, 1, 1, 1, 0, 0, 0, 0,
+                0, 0, 1, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0],
+            CROSS: [ // ✗
+                1, 0, 0, 0, 0, 0, 0, 1,
+                0, 1, 0, 0, 0, 0, 1, 0,
+                0, 0, 1, 0, 0, 1, 0, 0,
+                0, 0, 0, 1, 1, 0, 0, 0,
+                0, 0, 0, 1, 1, 0, 0, 0,
+                0, 0, 1, 0, 0, 1, 0, 0,
+                0, 1, 0, 0, 0, 0, 1, 0,
+                1, 0, 0, 0, 0, 0, 0, 1],
+            EXPLODE_1: [
+                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1, 1, 0, 0, 0,
+                0, 0, 0, 1, 1, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0],
+            EXPLODE_2: [
+                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 1, 0, 0, 1, 0, 0,
+                0, 1, 0, 0, 0, 0, 1, 0,
+                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 1, 0, 0, 0, 0, 1, 0,
+                0, 0, 1, 0, 0, 1, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0]
+        };
+
+        // 數字字型 3x5
+        const NUMBERS = [
+            [1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1], // 0
+            [0, 1, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 1, 1, 1], // 1
+            [1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1], // 2
+            [1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1], // 3
+            [1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1], // 4
+            [1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1], // 5
+            [1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1], // 6
+            [1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1], // 7
+            [1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1], // 8
+            [1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1]  // 9
+        ];
+
+        const LED_COLORS = {
+            red: '#ff3333', green: '#33ff33', blue: '#33bbff', yellow: '#ffee33',
+            white: '#eeeeee', orange: '#ff9933', cyan: '#33ffdd'
+        };
+
+        // 四個籃框（順序＝鍵盤 1~4）
+        const CATEGORIES = [
+            { id: 'recycle', name: '資源回收', emoji: '♻️', color: '#33ff33' },
+            { id: 'organic', name: '廚餘', emoji: '🍎', color: '#ffee33' },
+            { id: 'general', name: '一般垃圾', emoji: '🗑️', color: '#dddddd' },
+            { id: 'hazardous', name: '有害垃圾', emoji: '⚠️', color: '#ff3333' }
+        ];
+
+        // 題庫
+        const ITEMS = [
+            { name: '寶特瓶', art: ART.BOTTLE, color: 'blue', category: 'recycle' },
+            { name: '舊報紙', art: ART.PAPER, color: 'white', category: 'recycle' },
+            { name: '鋁罐', art: ART.CAN, color: 'red', category: 'recycle' },
+            { name: '蘋果核', art: ART.APPLE, color: 'red', category: 'organic' },
+            { name: '香蕉皮', art: ART.BANANA, color: 'yellow', category: 'organic' },
+            { name: '面紙', art: ART.TISSUE, color: 'white', category: 'general' },
+            { name: '口罩', art: ART.MASK, color: 'cyan', category: 'general' },
+            { name: '廢電池', art: ART.BATTERY, color: 'orange', category: 'hazardous' }
+        ];
+
+        // =====================================================
+        // 2. 場景、相機、後製光暈
+        // =====================================================
+        const stage = document.getElementById('stage');
+        let renderer;
+        try {
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        } catch (err) {
+            document.getElementById('btnStart').textContent = '此裝置不支援 WebGL，無法顯示 3D 畫面';
+            throw err;
+        }
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        stage.prepend(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color('#0b0b1a');
+        scene.fog = new THREE.Fog('#0b0b1a', 22, 70);
+
+        const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+        controls.enablePan = false;
+        controls.minPolarAngle = Math.PI * 0.30;
+        controls.maxPolarAngle = Math.PI * 0.56;
+        controls.minAzimuthAngle = -0.75;
+        controls.maxAzimuthAngle = 0.75;
+
+        const composer = new EffectComposer(renderer);
+        composer.addPass(new RenderPass(scene, camera));
+        const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.5, 0.2, 0.95);
+        composer.addPass(bloom);
+        composer.addPass(new OutputPass());
+
+        // 燈光
+        scene.add(new THREE.HemisphereLight('#8fa0ff', '#2a1520', 0.7));
+        const keyLight = new THREE.DirectionalLight('#ffffff', 1.2);
+        keyLight.position.set(3, 9, 12);
+        scene.add(keyLight);
+        const pinkLight = new THREE.PointLight('#e94560', 28, 22);
+        const cyanLight = new THREE.PointLight('#00ffcc', 28, 22);
+        scene.add(pinkLight, cyanLight);
+
+        // 小工具：產生 canvas 貼圖
+        function canvasTexture(w, h, draw, repeat) {
+            const c = document.createElement('canvas');
+            c.width = w; c.height = h;
+            draw(c.getContext('2d'), w, h);
+            const t = new THREE.CanvasTexture(c);
+            t.colorSpace = THREE.SRGBColorSpace;
+            t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+            if (repeat) {
+                t.wrapS = t.wrapT = THREE.RepeatWrapping;
+                t.repeat.set(repeat[0], repeat[1]);
+            }
+            return t;
+        }
+
+        // 地板（木地板）
+        const floorTex = canvasTexture(512, 512, (g, w, h) => {
+            for (let i = 0; i < 8; i++) {
+                g.fillStyle = i % 2 ? '#30231d' : '#281c17';
+                g.fillRect(0, i * 64, w, 64);
+                g.fillStyle = '#170f0b';
+                g.fillRect(0, i * 64, w, 2);
+                g.fillRect((i * 173) % w, i * 64, 3, 64);
+            }
+        }, [12, 12]);
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(70, 70),
+            new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.75, metalness: 0.05 })
+        );
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.set(0, 0, 25);
+        scene.add(floor);
+
+        // 背牆
+        const wallTex = canvasTexture(256, 256, (g, w, h) => {
+            g.fillStyle = '#141c38';
+            g.fillRect(0, 0, w, h);
+            g.strokeStyle = 'rgba(255,255,255,0.05)';
+            g.lineWidth = 2;
+            g.strokeRect(0, 0, w, h);
+        }, [24, 12]);
+        const wall = new THREE.Mesh(
+            new THREE.PlaneGeometry(60, 30),
+            new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.9 })
+        );
+        wall.position.set(0, 15, -0.35);
+        scene.add(wall);
+
+        // 牆面霓虹邊條
+        const neonL = new THREE.Mesh(new THREE.BoxGeometry(0.09, 1, 0.09),
+            new THREE.MeshBasicMaterial({ color: new THREE.Color('#e94560').multiplyScalar(2) }));
+        const neonR = new THREE.Mesh(new THREE.BoxGeometry(0.09, 1, 0.09),
+            new THREE.MeshBasicMaterial({ color: new THREE.Color('#00ffcc').multiplyScalar(2) }));
+        scene.add(neonL, neonR);
+
+        const frameMat = new THREE.MeshStandardMaterial({ color: '#2b2b3d', roughness: 0.45, metalness: 0.7 });
+
+        // =====================================================
+        // 3. 中央 8x8 LED 矩陣看板
+        // =====================================================
+        const PITCH = 0.3;
+        const matrixGroup = new THREE.Group();
+        scene.add(matrixGroup);
+        const bezel = new THREE.Mesh(new THREE.BoxGeometry(2.9, 2.9, 0.25), frameMat);
+        const backing = new THREE.Mesh(new THREE.BoxGeometry(2.62, 2.62, 0.04),
+            new THREE.MeshStandardMaterial({ color: '#050505', roughness: 0.95 }));
+        backing.position.z = 0.135;
+        matrixGroup.add(bezel, backing);
+
+        // LED 用「亮度倍率」材質：顏色乘以 1.5 讓光暈抓得到
+        const matrixLeds = new THREE.InstancedMesh(
+            new THREE.SphereGeometry(0.12, 18, 12),
+            new THREE.MeshBasicMaterial({ color: new THREE.Color(1.5, 1.5, 1.5) }),
+            64
+        );
+        const OFF_COLOR = new THREE.Color(0.012, 0.012, 0.016);
+        const colorCache = {};
+        const ledColor = (name) => colorCache[name] || (colorCache[name] = new THREE.Color(LED_COLORS[name]));
+        {
+            const m = new THREE.Matrix4();
+            for (let i = 0; i < 64; i++) {
+                const row = Math.floor(i / 8), col = i % 8;
+                m.makeTranslation((col - 3.5) * PITCH, (3.5 - row) * PITCH, 0.16);
+                matrixLeds.setMatrixAt(i, m);
+                matrixLeds.setColorAt(i, OFF_COLOR);
+            }
+        }
+        matrixGroup.add(matrixLeds);
+        let matrixDirty = true;
+
+        function setDot(i, colorName) {
+            matrixLeds.setColorAt(i, colorName ? ledColor(colorName) : OFF_COLOR);
+            matrixDirty = true;
+        }
+        function drawMatrix(art, colorName) {
+            for (let i = 0; i < 64; i++) setDot(i, art && art[i] === 1 ? colorName : null);
+        }
+        function clearMatrix() {
+            for (let i = 0; i < 64; i++) setDot(i, null);
+        }
+
+        // =====================================================
+        // 4. 計分板與物品名稱看板（canvas 貼圖）
+        // =====================================================
+        function makeTextPanel(w, h, cw, ch) {
+            const canvas = document.createElement('canvas');
+            canvas.width = cw; canvas.height = ch;
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+            const face = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+                new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(1.3, 1.3, 1.3) }));
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(w + 0.16, h + 0.16, 0.12), frameMat);
+            frame.position.z = -0.07;
+            const group = new THREE.Group();
+            group.add(frame, face);
+            scene.add(group);
+            return { group, canvas, ctx: canvas.getContext('2d'), tex };
+        }
+
+        const board = makeTextPanel(4.4, 0.69, 1024, 160);
+        const namePanel = makeTextPanel(3.6, 0.56, 1024, 160);
+
+        let score = 0, cCount = 0, iCount = 0;
+        let timeLeft = 30, shownTime = 30;
+        const pad = (n, len) => n.toString().padStart(len, '0');
+
+        function drawScoreboard() {
+            const { ctx, canvas: c, tex } = board;
+            ctx.fillStyle = '#030303';
+            ctx.fillRect(0, 0, c.width, c.height);
+            ctx.font = 'bold 76px "Courier New", Courier, monospace';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#ffd700';
+            ctx.textAlign = 'left';
+            ctx.fillText('SCORE:' + pad(score, 4), 40, c.height / 2 + 4);
+            ctx.textAlign = 'right';
+            ctx.fillStyle = shownTime <= 10 ? '#ff3333' : '#ffd700';
+            ctx.fillText('TIME:' + pad(shownTime, 2), c.width - 40, c.height / 2 + 4);
+            tex.needsUpdate = true;
+        }
+
+        function setName(text) {
+            const { ctx, canvas: c, tex } = namePanel;
+            ctx.fillStyle = '#030303';
+            ctx.fillRect(0, 0, c.width, c.height);
+            ctx.font = 'bold 84px "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#00ffcc';
+            ctx.fillText(text, c.width / 2, c.height / 2 + 4, c.width - 40);
+            tex.needsUpdate = true;
+        }
+
+        // =====================================================
+        // 5. 四個籃框（壓克力籃板 + 籃框 + 籃網 + WS2812 燈環）
+        // =====================================================
+        const BW = 2.0, BH = 1.25;
+        const RIM_LOCAL = new THREE.Vector3(0, -BH / 2 + 0.12, 0.55);
+        const RING_N = 56;
+        const hoops = [];
+        const hoopById = {};
+        const hitBoxes = [];
+
+        function buildNet(rTop, rBot, h) {
+            const strands = 14, rings = 4, pts = [];
+            for (let r = 0; r < rings; r++) {
+                const t0 = r / rings, t1 = (r + 1) / rings;
+                const y0 = -h * t0, y1 = -h * t1;
+                const rad0 = rTop + (rBot - rTop) * t0, rad1 = rTop + (rBot - rTop) * t1;
+                for (let s = 0; s < strands; s++) {
+                    const a0 = (s + (r % 2) * 0.5) / strands * Math.PI * 2;
+                    const step = Math.PI / strands;
+                    for (const a1 of [a0 - step, a0 + step]) {
+                        pts.push(Math.cos(a0) * rad0, y0, Math.sin(a0) * rad0,
+                            Math.cos(a1) * rad1, y1, Math.sin(a1) * rad1);
+                    }
+                }
+            }
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+            return new THREE.LineSegments(geo,
+                new THREE.LineBasicMaterial({ color: '#e8e8e8', transparent: true, opacity: 0.8 }));
+        }
+
+        function rectPerimeter(w, h, n) {
+            const P = 2 * (w + h), out = [];
+            for (let i = 0; i < n; i++) {
+                let d = (i / n) * P, x, y;
+                if (d < w) { x = -w / 2 + d; y = -h / 2; }
+                else if ((d -= w) < h) { x = w / 2; y = -h / 2 + d; }
+                else if ((d -= h) < w) { x = w / 2 - d; y = h / 2; }
+                else { d -= w; x = -w / 2; y = h / 2 - d; }
+                out.push([x, y]);
+            }
+            return out;
+        }
+
+        const ringGeo = new THREE.SphereGeometry(0.036, 10, 8);
+        const boardMat = new THREE.MeshPhysicalMaterial({
+            color: '#0d1430', roughness: 0.15, metalness: 0.1, clearcoat: 1, transparent: true, opacity: 0.88
+        });
+
+        CATEGORIES.forEach((cat, index) => {
+            const group = new THREE.Group();
+            const col = new THREE.Color(cat.color);
+
+            const plate = new THREE.Mesh(new THREE.BoxGeometry(BW, BH, 0.06), boardMat);
+            plate.position.z = 0.1;
+            group.add(plate);
+
+            // 籃板標籤
+            const labelTex = canvasTexture(512, 150, (g, w, h) => {
+                g.clearRect(0, 0, w, h);
+                g.textBaseline = 'middle';
+                g.textAlign = 'center';
+                g.font = 'bold 60px "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif';
+                g.fillStyle = cat.color;
+                g.fillText(cat.emoji + ' ' + cat.name, w / 2 + 22, h / 2 + 4, w - 90);
+                g.beginPath();
+                g.arc(40, h / 2, 26, 0, Math.PI * 2);
+                g.lineWidth = 4;
+                g.strokeStyle = cat.color;
+                g.stroke();
+                g.font = 'bold 34px monospace';
+                g.fillText(String(index + 1), 40, h / 2 + 2);
+            });
+            const label = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.5),
+                new THREE.MeshBasicMaterial({ map: labelTex, transparent: true, color: new THREE.Color(1.15, 1.15, 1.15) }));
+            label.position.set(0, 0.33, 0.135);
+            group.add(label);
+
+            // 籃板瞄準框
+            const target = new THREE.LineSegments(
+                new THREE.EdgesGeometry(new THREE.PlaneGeometry(0.62, 0.42)),
+                new THREE.LineBasicMaterial({ color: col.clone().multiplyScalar(1.4) }));
+            target.position.set(0, RIM_LOCAL.y + 0.33, 0.135);
+            group.add(target);
+
+            // 支架 + 籃框
+            const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, 0.32), frameMat);
+            bracket.position.set(0, RIM_LOCAL.y, 0.27);
+            group.add(bracket);
+            const rim = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.026, 10, 44),
+                new THREE.MeshStandardMaterial({ color: cat.color, emissive: cat.color, emissiveIntensity: 0.25, metalness: 0.5, roughness: 0.35 }));
+            rim.rotation.x = Math.PI / 2;
+            rim.position.copy(RIM_LOCAL);
+            group.add(rim);
+
+            const net = buildNet(0.32, 0.2, 0.5);
+            net.position.copy(RIM_LOCAL);
+            group.add(net);
+
+            // WS2812 燈環（沿籃板外框）
+            const ring = new THREE.InstancedMesh(ringGeo,
+                new THREE.MeshBasicMaterial({ color: new THREE.Color(1.8, 1.8, 1.8) }), RING_N);
+            const m = new THREE.Matrix4();
+            rectPerimeter(BW + 0.1, BH + 0.1, RING_N).forEach(([x, y], i) => {
+                m.makeTranslation(x, y, 0.1);
+                ring.setMatrixAt(i, m);
+                ring.setColorAt(i, OFF_COLOR);
+            });
+            group.add(ring);
+
+            // 點擊判定用的隱形方塊
+            const hit = new THREE.Mesh(new THREE.BoxGeometry(BW + 0.2, BH + 0.7, 1.3),
+                new THREE.MeshBasicMaterial({ visible: false }));
+            hit.position.set(0, -0.25, 0.5);
+            group.add(hit);
+
+            scene.add(group);
+            const hoop = { cat, index, group, col, net, ring, rimWorld: new THREE.Vector3(), mode: 'idle', t0: 0, netT: 0 };
+            hit.userData.hoop = hoop;
+            hitBoxes.push(hit);
+            hoops.push(hoop);
+            hoopById[cat.id] = hoop;
+        });
+
+        const tmpCol = new THREE.Color();
+        const GREEN = new THREE.Color('#33ff33'), RED = new THREE.Color('#ff3333');
+
+        function ringFx(hoop, mode) {
+            hoop.mode = mode;
+            hoop.t0 = performance.now();
+        }
+
+        function updateRing(h, now) {
+            const t = (now - h.t0) / 1000;
+            if (h.mode === 'good' && t > 1.3) h.mode = 'idle';
+            if (h.mode === 'bad' && t > 1.2) h.mode = 'idle';
+            if (h.mode === 'hint' && t > 1.8) h.mode = 'idle';
+            const head = (now / 1000 * 18 + h.index * 14) % RING_N;
+            for (let i = 0; i < RING_N; i++) {
+                let c;
+                if (h.mode === 'good') {
+                    c = t < 0.6
+                        ? (Math.floor(t * 10) % 2 === 0 ? GREEN : OFF_COLOR)
+                        : tmpCol.setHSL((i / RING_N + t * 1.2) % 1, 1, 0.55);
+                } else if (h.mode === 'bad') {
+                    c = Math.floor(t * 8) % 2 === 0 ? RED : OFF_COLOR;
+                } else if (h.mode === 'hint') {
+                    c = Math.floor(t * 5) % 2 === 0 ? h.col : OFF_COLOR;
+                } else {
+                    const d = (head - i + RING_N) % RING_N;
+                    const k = d < 7 ? 1 - d / 7 : 0;
+                    c = tmpCol.copy(h.col).multiplyScalar(0.1 + 0.9 * k);
+                }
+                h.ring.setColorAt(i, c);
+            }
+            h.ring.instanceColor.needsUpdate = true;
+        }
+
+        // =====================================================
+        // 6. 版面配置（橫向一排四框 / 直向 2x2）與相機取景
+        // =====================================================
+        const LAYOUTS = {
+            land: {
+                board: [0, 6.75], matrix: [0, 4.75], name: [0, 2.85],
+                hoops: [[-4.2, 1.6], [-1.4, 1.6], [1.4, 1.6], [4.2, 1.6]],
+                bounds: [-5.3, 5.3, 0.5, 7.2]
+            },
+            port: {
+                board: [0, 8.4], matrix: [0, 6.4], name: [0, 4.55],
+                hoops: [[-1.25, 3.45], [1.25, 3.45], [-1.25, 1.6], [1.25, 1.6]],
+                bounds: [-2.4, 2.4, 0.5, 8.85]
+            }
+        };
+        let layout = LAYOUTS.land;
+        let layoutName = 'land';
+
+        function applyLayout(name) {
+            layoutName = name;
+            layout = LAYOUTS[name];
+            board.group.position.set(layout.board[0], layout.board[1], 0);
+            matrixGroup.position.set(layout.matrix[0], layout.matrix[1], 0);
+            namePanel.group.position.set(layout.name[0], layout.name[1], 0);
+            hoops.forEach((h, i) => {
+                h.group.position.set(layout.hoops[i][0], layout.hoops[i][1], 0);
+                h.group.updateMatrixWorld(true);
+                h.rimWorld.copy(RIM_LOCAL).applyMatrix4(h.group.matrixWorld);
+            });
+            const [x0, x1, y0, y1] = layout.bounds;
+            const hgt = y1 - y0;
+            neonL.scale.y = neonR.scale.y = hgt;
+            neonL.position.set(x0 - 0.6, (y0 + y1) / 2, -0.2);
+            neonR.position.set(x1 + 0.6, (y0 + y1) / 2, -0.2);
+            neonL.visible = neonR.visible = name === 'land';   // 直向畫面太窄，收起霓虹邊條
+            pinkLight.position.set(x0 - 1.5, y1 - 1, 3);
+            cyanLight.position.set(x1 + 1.5, y1 - 1, 3);
+        }
+
+        function fitCamera() {
+            const [x0, x1, y0, y1] = layout.bounds;
+            const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+            const hw = (x1 - x0) / 2 + 0.45, hh = (y1 - y0) / 2 + 0.45;
+            const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+            const d = Math.max(hh / tanV, hw / (tanV * camera.aspect)) + 0.6;
+            camera.position.set(cx, cy - d * 0.12, d);
+            controls.target.set(cx, cy, 0);
+            controls.minDistance = d * 0.5;
+            controls.maxDistance = d * 1.6;
+            controls.update();
+        }
+
+        function onResize() {
+            const w = stage.clientWidth, h = stage.clientHeight;
+            if (!w || !h) return;
+            renderer.setSize(w, h, false);
+            composer.setSize(w, h);
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            applyLayout(w / h < 0.95 ? 'port' : 'land');
+            fitCamera();
+        }
+        new ResizeObserver(onResize).observe(stage);
+
+        // =====================================================
+        // 7. 籃球（拋物線飛行 → 穿網 → 落地彈跳）
+        // =====================================================
+        const BALL_R = 0.15;
+        const ballTex = canvasTexture(512, 256, (g, w, h) => {
+            const grd = g.createLinearGradient(0, 0, 0, h);
+            grd.addColorStop(0, '#c9561a');
+            grd.addColorStop(0.5, '#ee7a24');
+            grd.addColorStop(1, '#c9561a');
+            g.fillStyle = grd;
+            g.fillRect(0, 0, w, h);
+            g.fillStyle = 'rgba(0,0,0,0.08)';
+            for (let i = 0; i < 1800; i++) g.fillRect(Math.random() * w, Math.random() * h, 2, 2);
+            g.strokeStyle = '#1a0d06';
+            g.lineWidth = 5;
+            g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
+            [w / 4, w * 3 / 4].forEach(x => { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); });
+            const lens = (cx) => [1, -1].forEach(s => {
+                g.beginPath();
+                for (let y = 0; y <= h; y += 4) {
+                    const x = cx + s * 70 * Math.sin(Math.PI * y / h);
+                    y === 0 ? g.moveTo(x, y) : g.lineTo(x, y);
+                }
+                g.stroke();
+            });
+            lens(0); lens(w / 2); lens(w);
+        });
+        const ballGeo = new THREE.SphereGeometry(BALL_R, 32, 20);
+        const ballMat = new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.6 });
+        const shadowTex = canvasTexture(128, 128, (g, w, h) => {
+            const grd = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+            grd.addColorStop(0, 'rgba(0,0,0,0.85)');
+            grd.addColorStop(1, 'rgba(0,0,0,0)');
+            g.fillStyle = grd;
+            g.fillRect(0, 0, w, h);
+        });
+        const shadowGeo = new THREE.PlaneGeometry(0.5, 0.5).rotateX(-Math.PI / 2);
+        const balls = [];
+
+        function launchBall(hoop) {
+            return new Promise(resolve => {
+                const S = camera.localToWorld(new THREE.Vector3(0, -0.55, -2.2));
+                const R = hoop.rimWorld.clone();
+                R.y += 0.06;
+                const dist = S.distanceTo(R);
+                const mesh = new THREE.Mesh(ballGeo, ballMat);
+                mesh.position.copy(S);
+                const shadow = new THREE.Mesh(shadowGeo,
+                    new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
+                scene.add(mesh, shadow);
+                balls.push({
+                    mesh, shadow, hoop, S, R,
+                    T: 0.65 + dist * 0.035,
+                    h: 1.2 + dist * 0.08,
+                    t: 0, phase: 'fly', vel: new THREE.Vector3(),
+                    swished: false, exited: false, onSwish: resolve
+                });
+                while (balls.length > 6) {
+                    const old = balls.shift();
+                    scene.remove(old.mesh, old.shadow);
+                    old.shadow.material.dispose();
+                    if (old.onSwish) { const f = old.onSwish; old.onSwish = null; f(); }
+                }
+                playSound('throw');
+            });
+        }
+
+        function updateBalls(dt) {
+            for (const b of balls) {
+                const p = b.mesh.position;
+                if (b.phase === 'fly') {
+                    b.t += dt / b.T;
+                    const t = Math.min(b.t, 1);
+                    const e = 0.82 * (t * (2 - t)) + 0.18 * t;   // 水平：先快後慢
+                    p.set(
+                        b.S.x + (b.R.x - b.S.x) * e,
+                        b.S.y + (b.R.y - b.S.y) * t + b.h * 4 * t * (1 - t),
+                        b.S.z + (b.R.z - b.S.z) * e
+                    );
+                    b.mesh.rotation.x -= dt * 9;
+                    if (b.t >= 1) { b.phase = 'drop'; b.vel.set(0, -2.2, 0); }
+                } else {
+                    b.vel.y -= 9.8 * dt;
+                    p.addScaledVector(b.vel, dt);
+                    const rim = b.hoop.rimWorld;
+                    if (!b.swished && p.y < rim.y - 0.18) {
+                        b.swished = true;
+                        b.hoop.netT = 0.0001;
+                        playSound('swish');
+                        if (b.onSwish) { const f = b.onSwish; b.onSwish = null; f(); }
+                    }
+                    if (!b.exited && p.y < rim.y - 0.5) {
+                        b.exited = true;
+                        b.vel.z = 1.8 + Math.random() * 0.5;
+                        b.vel.x = (Math.random() - 0.5) * 0.6;
+                    }
+                    if (p.y < BALL_R) {
+                        p.y = BALL_R;
+                        if (Math.abs(b.vel.y) > 0.8) playSound('bounce', Math.min(1, Math.abs(b.vel.y) / 5));
+                        b.vel.y = -b.vel.y * 0.55;
+                        if (Math.abs(b.vel.y) < 0.5) b.vel.y = 0;
+                        b.vel.x *= 0.85;
+                        b.vel.z *= 0.85;
+                    }
+                    if (p.y <= BALL_R + 0.001) {
+                        const f = Math.max(0, 1 - 1.4 * dt);
+                        b.vel.x *= f;
+                        b.vel.z *= f;
+                        b.mesh.rotation.x += b.vel.z * dt / BALL_R;
+                        b.mesh.rotation.z -= b.vel.x * dt / BALL_R;
+                    }
+                }
+                b.shadow.position.set(p.x, 0.012, p.z);
+                const s = 1 + p.y * 0.25;
+                b.shadow.scale.set(s, 1, s);
+                b.shadow.material.opacity = THREE.MathUtils.clamp(0.55 - p.y * 0.07, 0.08, 0.55);
+            }
+        }
+
+        function updateNets(dt) {
+            for (const h of hoops) {
+                if (h.netT <= 0) continue;
+                h.netT += dt / 0.5;
+                const p = Math.min(h.netT, 1);
+                const s = Math.sin(Math.PI * p) * (1 - p * 0.5);
+                h.net.scale.set(1 - 0.18 * s, 1 + 0.45 * s, 1 - 0.18 * s);
+                if (p >= 1) { h.netT = 0; h.net.scale.set(1, 1, 1); }
+            }
+        }
+
+        // =====================================================
+        // 8. 音效與語音
+        // =====================================================
+        let AC = null, noiseBuf = null;
+        function audio() {
+            if (!AC) {
+                const C = window.AudioContext || window.webkitAudioContext;
+                if (!C) return null;
+                AC = new C();
+                noiseBuf = AC.createBuffer(1, AC.sampleRate * 0.4, AC.sampleRate);
+                const d = noiseBuf.getChannelData(0);
+                for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+            }
+            if (AC.state === 'suspended') AC.resume();
+            return AC;
+        }
+
+        function noiseBurst(ac, freq, q, vol, dur, freqEnd) {
+            const t = ac.currentTime;
+            const src = ac.createBufferSource();
+            src.buffer = noiseBuf;
+            const f = ac.createBiquadFilter();
+            f.type = 'bandpass';
+            f.Q.value = q;
+            f.frequency.setValueAtTime(freq, t);
+            if (freqEnd) f.frequency.exponentialRampToValueAtTime(freqEnd, t + dur);
+            const g = ac.createGain();
+            g.gain.setValueAtTime(vol, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+            src.connect(f); f.connect(g); g.connect(ac.destination);
+            src.start(t);
+            src.stop(t + dur);
+        }
+
+        function playSound(type, vol = 1) {
+            const ac = audio();
+            if (!ac) return;
+            const t = ac.currentTime;
+            if (type === 'right' || type === 'wrong' || type === 'bounce') {
+                const osc = ac.createOscillator();
+                const g = ac.createGain();
+                osc.connect(g); g.connect(ac.destination);
+                if (type === 'right') {          // 與 2D 版相同
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(800, t);
+                    osc.frequency.linearRampToValueAtTime(1200, t + 0.1);
+                    g.gain.setValueAtTime(0.5, t);
+                    g.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+                    osc.start(t); osc.stop(t + 0.2);
+                } else if (type === 'wrong') {   // 與 2D 版相同
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(200, t);
+                    osc.frequency.linearRampToValueAtTime(100, t + 0.3);
+                    g.gain.setValueAtTime(0.5, t);
+                    g.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+                    osc.start(t); osc.stop(t + 0.3);
+                } else {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(130, t);
+                    osc.frequency.exponentialRampToValueAtTime(55, t + 0.12);
+                    g.gain.setValueAtTime(0.45 * vol, t);
+                    g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+                    osc.start(t); osc.stop(t + 0.15);
+                }
+            } else if (type === 'swish') {
+                noiseBurst(ac, 3200, 0.8, 0.35, 0.25);
+            } else if (type === 'throw') {
+                noiseBurst(ac, 900, 1.2, 0.12, 0.3, 300);
+            }
+        }
+
+        let zhVoice = null;
+        function pickVoice() {
+            const vs = window.speechSynthesis.getVoices();
+            zhVoice = vs.find(v => /zh[-_]TW/i.test(v.lang)) || vs.find(v => /^zh/i.test(v.lang)) || null;
+        }
+        if ('speechSynthesis' in window) {
+            pickVoice();
+            window.speechSynthesis.onvoiceschanged = pickVoice;
+        }
+        function speak(text) {
+            if (!('speechSynthesis' in window)) return;
+            const synth = window.speechSynthesis;
+            if (synth.speaking) synth.cancel();
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = 'zh-TW';
+            if (zhVoice) u.voice = zhVoice;
+            u.rate = 1.2;
+            synth.speak(u);
+        }
+
+        // =====================================================
+        // 9. 遊戲流程（沿用 2D 版規則）
+        // =====================================================
+        let isPlaying = false, isAnimating = false, currentItem = null, lastIdx = -1;
+        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+        const startOverlay = document.getElementById('startOverlay');
+        const endOverlay = document.getElementById('endOverlay');
+        const busyChip = document.getElementById('busyChip');
+        const hintChip = document.getElementById('hintChip');
+
+        function setBusy(on) {
+            isAnimating = on;
+            busyChip.style.opacity = on && isPlaying ? '1' : '0';
+        }
+
+        function startGame() {
+            audio();
+            startOverlay.style.display = 'none';
+            endOverlay.style.display = 'none';
+            score = 0; cCount = 0; iCount = 0;
+            timeLeft = 30; shownTime = 30;
+            isPlaying = true;
+            setBusy(false);
+            drawScoreboard();
+            nextItem();
+            setTimeout(() => { hintChip.style.opacity = '0'; }, 5000);
+        }
+
+        function endGame() {
+            isPlaying = false;
+            setBusy(false);
+            clearMatrix();
+            setName('');
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('finalCorrect').textContent = cCount;
+            document.getElementById('finalWrong').textContent = iCount;
+            endOverlay.style.display = 'flex';
+        }
+
+        function nextItem() {
+            if (!isPlaying) return;
+            let idx;
+            do { idx = Math.floor(Math.random() * ITEMS.length); } while (ITEMS.length > 1 && idx === lastIdx);
+            lastIdx = idx;
+            currentItem = ITEMS[idx];
+            drawMatrix(currentItem.art, currentItem.color);
+            setName(currentItem.name);
+            speak(currentItem.name);
+        }
+
+        // 分數與題數播放程序（左上角屬性點 + 3x5 數字逐位閃爍）
+        async function flashNumberSequence(num, color, dotColor) {
+            const digits = num.toString().split('');
+            for (const ch of digits) {
+                clearMatrix();
+                setDot(0, dotColor);
+                const nArt = NUMBERS[parseInt(ch, 10)];
+                for (let r = 0; r < 5; r++) {
+                    for (let c = 0; c < 3; c++) {
+                        if (nArt[r * 3 + c] === 1) setDot((r + 1) * 8 + (c + 4), color);
+                    }
+                }
+                if (!isPlaying) return;
+                await sleep(500);
+                clearMatrix();
+                if (!isPlaying) return;
+                await sleep(100);
+            }
+        }
+
+        async function throwBall(catId) {
+            if (!isPlaying || isAnimating || !currentItem) return;
+            setBusy(true);
+            const hoop = hoopById[catId];
+            const item = currentItem;
+            flashPad(catId);
+            setName('投籃中…');
+
+            await launchBall(hoop);           // 球穿過籃網時才判定
+            if (!isPlaying) { setBusy(false); return; }
+
+            if (catId === item.category) {
+                playSound('right');
+                score += 100;
+                cCount += 1;
+                drawScoreboard();
+                ringFx(hoop, 'good');
+                setName('✓ 答對！');
+                drawMatrix(ART.TICK, 'green');
+                await sleep(600);
+            } else {
+                playSound('wrong');
+                score = Math.max(0, score - 50);
+                iCount += 1;
+                drawScoreboard();
+                ringFx(hoop, 'bad');
+                const right = hoopById[item.category];
+                ringFx(right, 'hint');        // 正確的籃框閃爍提示
+                setName('✗ 應投：' + right.cat.emoji + ' ' + right.cat.name);
+                drawMatrix(ART.CROSS, 'red');
+                await sleep(300);
+                drawMatrix(ART.EXPLODE_1, 'yellow');
+                await sleep(150);
+                drawMatrix(ART.EXPLODE_2, 'red');
+                await sleep(150);
+                clearMatrix();
+                await sleep(100);
+                drawMatrix(ART.EXPLODE_2, 'red');
+                await sleep(450);
+            }
+
+            // LED 動態戰況播報
+            if (isPlaying) {
+                setName('答對: ' + cCount);
+                await flashNumberSequence(cCount, 'blue', 'green');
+                setName('答錯: ' + iCount);
+                await flashNumberSequence(iCount, 'blue', 'red');
+                setName('得分: ' + score);
+                await flashNumberSequence(score, 'white', 'yellow');
+            }
+
+            setBusy(false);
+            if (isPlaying) nextItem();
+        }
+
+        function flashPad(catId) {
+            const b = document.querySelector('.pad-btn[data-cat="' + catId + '"]');
+            if (!b) return;
+            b.classList.add('hit');
+            setTimeout(() => b.classList.remove('hit'), 250);
+        }
+
+        // =====================================================
+        // 10. 操作：按鈕、鍵盤、點擊 3D 籃框
+        // =====================================================
+        document.querySelectorAll('.pad-btn').forEach(b => {
+            b.addEventListener('click', () => throwBall(b.dataset.cat));
+        });
+        document.getElementById('btnStart').addEventListener('click', startGame);
+        document.getElementById('btnRetry').addEventListener('click', startGame);
+        document.getElementById('btnView').addEventListener('click', fitCamera);
+
+        window.addEventListener('keydown', (e) => {
+            const k = parseInt(e.key, 10);
+            if (k >= 1 && k <= 4) { throwBall(CATEGORIES[k - 1].id); return; }
+            if ((e.key === 'Enter' || e.key === ' ') && !isPlaying) {
+                e.preventDefault();
+                startGame();
+            }
+        });
+
+        const raycaster = new THREE.Raycaster();
+        const ndc = new THREE.Vector2();
+        function pickHoop(ev) {
+            const r = renderer.domElement.getBoundingClientRect();
+            ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+            raycaster.setFromCamera(ndc, camera);
+            const hits = raycaster.intersectObjects(hitBoxes, false);
+            return hits.length ? hits[0].object.userData.hoop : null;
+        }
+        let down = null;
+        renderer.domElement.addEventListener('pointerdown', (e) => {
+            down = { x: e.clientX, y: e.clientY, t: performance.now() };
+        });
+        renderer.domElement.addEventListener('pointerup', (e) => {
+            if (!down) return;
+            const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+            const quick = performance.now() - down.t < 500;
+            down = null;
+            if (moved < 10 && quick) {
+                const h = pickHoop(e);
+                if (h) throwBall(h.cat.id);
+            }
+        });
+        renderer.domElement.addEventListener('pointermove', (e) => {
+            if (e.pointerType !== 'mouse' || e.buttons) return;
+            renderer.domElement.style.cursor = pickHoop(e) ? 'pointer' : 'grab';
+        });
+
+        // =====================================================
+        // 11. 主迴圈
+        // =====================================================
+        let last = performance.now();
+        renderer.setAnimationLoop(() => {
+            const now = performance.now();
+            const raw = (now - last) / 1000;
+            last = now;
+            const dt = Math.min(raw, 0.1);
+
+            // 倒數只在「等待玩家投籃」時進行，播報動畫期間暫停
+            if (isPlaying && !isAnimating) {
+                timeLeft -= Math.min(raw, 0.25);
+                const s = Math.max(0, Math.ceil(timeLeft));
+                if (s !== shownTime) { shownTime = s; drawScoreboard(); }
+                if (timeLeft <= 0) endGame();
+            }
+
+            updateBalls(dt);
+            updateNets(dt);
+            for (const h of hoops) updateRing(h, now);
+            if (matrixDirty) { matrixLeds.instanceColor.needsUpdate = true; matrixDirty = false; }
+
+            controls.update();
+            composer.render();
+        });
+
+        // 初始化
+        onResize();
+        drawScoreboard();
+        setName('');
+        clearMatrix();
+        const btnStart = document.getElementById('btnStart');
+        btnStart.disabled = false;
+        btnStart.textContent = '▶ 點擊開始';
+        window.__ecoBoot = true;
+
+        // 測試用掛勾（不影響遊戲）
+        window.__eco = {
+            state: () => ({ score, cCount, iCount, timeLeft, isPlaying, isAnimating, item: currentItem && currentItem.name, layout: layoutName }),
+            setTime: (t) => { timeLeft = t; },
+            rings: () => hoops.map(h => h.mode)
+        };
+    </script>
+</body>
+
+</html>
