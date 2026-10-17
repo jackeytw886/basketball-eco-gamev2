@@ -1,4 +1,19 @@
-# 環境保衛戰：垃圾分類投籃遊戲
+# Eco Basketball — 環境保衛戰・垃圾分類投籃
+
+<!-- ai-project-management:start -->
+## Project Index — 專案管理索引
+
+- **固定代號：P004**（綁定 GitHub 倉庫 ID 1163853406；不隨排序或改名重排）
+- **分類：互動裝置**；標籤：recycling, camera-control, led-matrix。
+- **中文用途：環境保衛戰・垃圾分類投籃**。
+- **入口：** `3d.html`、`index.html`。
+- **發布狀態：** GitHub Pages 已啟用；原有入口：https://jackeytw886.github.io/basketball-eco-gamev2。本次未做完整互動測試。
+- **命名處理：** 保留目前倉庫名稱，維持既有網站入口；分類名稱記錄於 PROJECT.json。
+- **AI 接手：** 先讀 [AGENTS.md](AGENTS.md)、[HANDOFF.md](HANDOFF.md)、[PROJECT.json](PROJECT.json) 與 [檔案地圖](docs/FILE-MAP.md)。
+- **總目錄：** [AI Project Hub](https://github.com/jackeytw886/ai-project-hub)（私人總目錄，依個別帳號權限讀取）。
+
+本次核對的是倉庫、檔案與文件；執行效果、實體接線及活動年度需由對應驗證紀錄確認。下方保留既有專案說明。
+<!-- ai-project-management:end -->
 
 看 8×8 LED 矩陣上的物品圖案（同時語音念出名稱），把它投進正確的分類籃框：♻️ 資源回收、🍎 廚餘、🗑️ 一般垃圾、⚠️ 有害垃圾。
 

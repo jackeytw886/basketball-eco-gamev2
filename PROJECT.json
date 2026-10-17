@@ -1,0 +1,37 @@
+{
+  "project_id": "P004",
+  "github_repository_id": 1163853406,
+  "title_en": "Eco Basketball",
+  "title_zh": "環境保衛戰・垃圾分類投籃",
+  "category": "install",
+  "topics": [
+    "recycling",
+    "camera-control",
+    "led-matrix"
+  ],
+  "repository_full_name": "jackeytw886/basketball-eco-gamev2",
+  "repository_url": "https://github.com/jackeytw886/basketball-eco-gamev2",
+  "default_branch": "main",
+  "visibility": "public",
+  "aliases": [],
+  "suggested_name": "install-eco-basketball",
+  "repository_status": "connected",
+  "content_state": "source-present",
+  "lifecycle": "unknown",
+  "pages_enabled": true,
+  "deployment_url": "https://jackeytw886.github.io/basketball-eco-gamev2",
+  "event_year": null,
+  "entry_paths": [
+    "3d.html",
+    "index.html"
+  ],
+  "related_project_ids": [
+    "P016"
+  ],
+  "handoff_path": "HANDOFF.md",
+  "verification_source": "github-tree-and-readme",
+  "verified_at": "2026-10-17T20:41:56+08:00",
+  "source_baseline_sha": "48cf236b4a77e3d7e1dd376ff08d32daf6379e2a",
+  "last_runtime_verified_sha": null,
+  "naming_status": "preserved-for-pages"
+}
